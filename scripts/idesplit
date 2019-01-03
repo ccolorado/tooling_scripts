@@ -1,16 +1,38 @@
 #!/bin/bash
 
-# session=$(tmux display-message -p '#S')
-# idesplit_directive=idesplit
-# if [ -f "$idesplit_directive" ]; then
-#   source $idesplit_directive;
-# fi
+set -x
+idesplit_directive=idesplit.ide
+session_exists=false
 
-session=$(tmux display-message -p '#S')
-if [ $? -eq 1 ]; then
-  tmux
-  session=$(tmux display-message -p '#S')
+if [ -f "$idesplit_directive" ]; then
+  source $idesplit_directive;
 fi
+
+if [ -z ${tmux_session_name+x} ]; then
+  session_attached=false
+  session_lookup=$(tmux ls | grep -e "^$tmux_session_name")
+  session_exsists=true
+  if [ $? ]; then
+    echo $session_lookup | grep "(attached)";
+    if [ $? ]; then
+      session_attached=true
+    fi;
+  fi
+
+fi
+
+# If session_exists tmux new-session -A $tmux_session_name; else
+
+  # # Create a new unamed session
+  # session=$(tmux display-message -p '#S')
+  # if [ $? -eq 1 ]; then
+  #   # tmux
+  #   session=$(tmux display-message -p '#S')
+  # fi
+
+# Short circuit loading
+exit 1
+
 
 git rev-parse --is-inside-work-tree 2> /dev/null
 is_git_repo=$?
