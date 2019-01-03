@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# session=$(tmux display-message -p '#S')
+# idesplit_directive=idesplit
+# if [ -f "$idesplit_directive" ]; then
+#   source $idesplit_directive;
+# fi
+
+session=$(tmux display-message -p '#S')
+if [ $? -eq 1 ]; then
+  tmux
+  session=$(tmux display-message -p '#S')
+fi
+
+git rev-parse --is-inside-work-tree 2> /dev/null
+is_git_repo=$?
+
+echo $session
+tmux split-window -v -p 20 -t "$session.0"
+tmux split-window -h -p 30 -t "$session.0"
+tmux split-window -v -p 25 -t "$session.1"
+tmux split-window -h -p 30 -t "$session.3"
+
+tmux send-keys -t $session.4 "gitstatusticker" C-m
+
+
+if [ -f "./sidekick.vim" ]; then
+  tmux send-keys -t $session.1 'vim -S ./sidekick.vim' C-m
+fi;
+
+dirname=$(basename "$PWD")
+
+if [ -f "$dirname.vim" ]; then
+
+  session_file="$dirname.vim"
+
+  if [ $is_git_repo -eq 0 ]; then
+
+    git_repository=$(git rev-parse --show-toplevel)
+    git_repository=$(basename $git_repository)
+
+    branch_name=$(git rev-parse --abbrev-ref HEAD)
+    branch_name=$(basedir $branch_name);
+
+    #TODO: build path, provided by brancher
+
+  fi
+
+  set -x
+  tmux send-keys -t $session.0 "vim -S ./$session_file" C-m
+  set +x
+fi;
+
