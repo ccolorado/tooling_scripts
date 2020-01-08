@@ -21,7 +21,8 @@ if [ -z ${tmux_session_name+x} ]; then
 
 fi
 
-# If session_exists tmux new-session -A $tmux_session_name; else
+# TODO: If session_exists tmux new-session -A $tmux_session_name; else
+# and test
 
   # # Create a new unamed session
   # session=$(tmux display-message -p '#S')
