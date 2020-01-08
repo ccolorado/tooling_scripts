@@ -1,76 +1,96 @@
 #!/bin/bash
 
+# Script that 
+#  * creates a tmux session with a predefined layout
+#  * attaches to existing session
+
 set -x
-idesplit_directive=idesplit.ide
-session_exists=false
 
-if [ -f "$idesplit_directive" ]; then
-  source $idesplit_directive;
+DEFAULT_IDESPLIT_SESSION_NAME=dev
+DEFAULT_IDESPLIT_TEST_PANE="dev.3"
+IDESPLIT_DIRECTIVE=.idesplit.ide
+idesplit_session_name=dev
+idesplit_test_pane="dev.3"
+
+if [ -f "$IDESPLIT_DIRECTIVE" ]; then
+  source $IDESPLIT_DIRECTIVE;
 fi
 
-if [ -z ${tmux_session_name+x} ]; then
-  session_attached=false
-  session_lookup=$(tmux ls | grep -e "^$tmux_session_name")
-  session_exsists=true
-  if [ $? ]; then
-    echo $session_lookup | grep "(attached)";
-    if [ $? ]; then
-      session_attached=true
-    fi;
-  fi
+idesplit_session_name=${idesplit_session_name:-$DEFAULT_IDESPLIT_SESSION_NAME}
+idesplit_test_pane=${idesplit_test_pane:-$DEFAULT_IDESPLIT_TEST_PANE}
 
+
+IDESPLIT_SESSION_EXISTS=1
+
+# Check if the defined session exists
+if [ -z ${idesplit_session_name+x} ]; then
+  $(tmux has -t=$idesplit_session_name)
+  IDESPLIT_SESSION_EXISTS=$?
+fi;
+
+
+# Get current tmux session's name
+CURRENT_SESSION_NAME=$(tmux display-message -p '#S')
+IS_SHELL_ATTACHED=$?
+
+if [ $IS_SHELL_ATTACHED -eq 1 ]; then
+  CURRENT_SESSION_NAME=""
 fi
-
-# TODO: If session_exists tmux new-session -A $tmux_session_name; else
-# and test
-
-  # # Create a new unamed session
-  # session=$(tmux display-message -p '#S')
-  # if [ $? -eq 1 ]; then
-  #   # tmux
-  #   session=$(tmux display-message -p '#S')
-  # fi
-
-# Short circuit loading
-exit 1
-
 
 git rev-parse --is-inside-work-tree 2> /dev/null
-is_git_repo=$?
+IS_GIT_PROYECT=$?
 
-echo $session
-tmux split-window -v -p 20 -t "$session.0"
-tmux split-window -h -p 30 -t "$session.0"
-tmux split-window -v -p 25 -t "$session.1"
-tmux split-window -h -p 30 -t "$session.3"
+echo "
+IDESPLIT_SESSION_EXISTS $IDESPLIT_SESSION_EXISTS
+idesplit_session_name   $idesplit_session_name
+idesplit_test_pane      $idesplit_test_pane
+CURRENT_SESSION_NAME    $CURRENT_SESSION_NAME
+IS_SHELL_ATTACHED       $IS_SHELL_ATTACHED
+IS_GIT_PROYECT          $IS_GIT_PROYECT
+"
 
-tmux send-keys -t $session.4 "gitstatusticker" C-m
-
-
-if [ -f "./sidekick.vim" ]; then
-  tmux send-keys -t $session.1 'vim -S ./sidekick.vim' C-m
-fi;
-
-dirname=$(basename "$PWD")
-
-if [ -f "$dirname.vim" ]; then
-
-  session_file="$dirname.vim"
-
-  if [ $is_git_repo -eq 0 ]; then
-
-    git_repository=$(git rev-parse --show-toplevel)
-    git_repository=$(basename $git_repository)
-
-    branch_name=$(git rev-parse --abbrev-ref HEAD)
-    branch_name=$(basedir $branch_name);
-
-    #TODO: build path, provided by brancher
-
+# If shell is attached, print some warnings if already attached
+if [ $IS_SHELL_ATTACHED -eq 0 ]; then
+  echo "Can't attach to $idesplit_session_name"
+  if [ "$CURRENT_SESSION_NAME" == "$idesplit_session_name" ];
+  then
+    echo "You are already aattached to $idesplit_session_name"
+    exit 0
   fi
+  echo "Please dettach from $CURRENT_SESSION_NAME first"
+  exit 1
+fi
 
-  set -x
-  tmux send-keys -t $session.0 "vim -S ./$session_file" C-m
-  set +x
-fi;
+# tmux new-session -d -n $idesplit_session_name
+echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+tmux new -d -s $idesplit_session_name
 
+if [ "$IDESPLIT_SESSION_EXISTS" -eq 1 ]; then
+  tmux split-window -v -p 20 -t "$CURRENT_SESSION_NAME.0"
+  tmux split-window -h -p 30 -t "$CURRENT_SESSION_NAME.0"
+  tmux split-window -v -p 25 -t "$CURRENT_SESSION_NAME.1"
+  tmux split-window -h -p 30 -t "$CURRENT_SESSION_NAME.3"
+  tmux send-keys -t $session.2 "gitstatusticker" C-m
+
+  # Load vim panels
+  dirname=$(basename "$PWD")
+  if [ -f "$dirname.vim" ]; then
+
+    session_file="$dirname.vim"
+
+    if [ $IS_GIT_PROYECT -eq 0 ]; then
+      git_repository=$(git rev-parse --show-toplevel)
+      git_repository=$(basename $git_repository)
+      branch_name=$(git rev-parse --abbrev-ref HEAD)
+      branch_name=$(basedir $branch_name);
+    fi
+    tmux send-keys -t $session.0 "vim -S ./$session_file" C-m
+  fi;
+
+  if [ -f "./sidekick.vim" ]; then
+    # TODO integrate with brancher sessions
+    tmux send-keys -t $session.1 'vim -S ./sidekick.vim' C-m
+  fi;
+fi
+
+tmux attach -t  $idesplit_session_name
