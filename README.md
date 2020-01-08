@@ -10,6 +10,7 @@ collection of scripts to automate several tasks
 | `brancher`   | Script that creates a central space for untracked files based on the current repository and branch |
 | `goto_projt` | Script that facilitates moving to project directories                                              |
 | `idesplit`   | Script that creates tmux session and layouts for tmux + vim developing                             |
+| `yt-pl`      | Script that runs youtube downloader unitl url list stops changign                                  |
 
 
 ## TODO's

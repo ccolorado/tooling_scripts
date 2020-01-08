@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Will continue trying to download an url playlist until it stops changing its checksum
+
+type youtube-dl > /dev/null
+if [ "$?" -ne "0" ];
+then
+  echo "youtube-dl could not be found on your system"
+  exit 1
+fi
+
+counter=0
+PLAYLIST_FILENAME=$1
+
+while true;
+do
+  echo "Starting download run #$counter"
+  youtube-dl -q -a "$PLAYLIST_FILENAME"
+  NEW_MD5=$(md5sum "$PLAYLIST_FILENAME")
+
+  if [ "$NEW_MD5" == "$OLD_MD5" ];
+  then
+    echo "No more urls to download"
+    exit 0
+  fi
+
+  OLD_MD5=$NEW_MD5
+  counter=$((counter+1))
+done
+
+
+
