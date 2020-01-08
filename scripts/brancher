@@ -1,0 +1,61 @@
+#!/bin/bash
+git rev-parse --is-inside-work-tree 2> /dev/null
+is_git_repo=$?
+wild_card_branch="wildcard_"$(date +"%m-%d-%y")
+
+if [ $is_git_repo -ne 0 ]; then
+
+  if [ -z ${1+x} ]; then 
+
+    echo "No branch found using wildcard $wild_card_branch";
+    current_branch=$wild_card_branch
+
+else
+
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+fi
+
+fi
+
+if [ ! -z "$1" ]
+then
+  echo "Creating branch for $1"
+  current_branch=$1
+fi
+
+# Storage of branch files
+branch_repo="$HOME/brancher"
+# brancher local directory
+brancher_dir="./.branch_dir"
+# branch directory
+
+brancher_branch_link="./.branch"
+brancher_branches_link="$brancher_dir/branch_all"
+brancher_global_link="$brancher_dir/branch_global"
+
+if [ -d "$brancher_dir" ]; then
+
+
+  rm $brancher_branch_link;
+  rm $brancher_branches_link;
+  rm $brancher_global_link;
+
+  find $brancher_dir  -maxdepth 0 -type f
+
+  if [ $? -ne 0 ];
+  then
+    echo "Brancher directory not empty, please clean up";
+    exit 1;
+  fi;
+
+fi
+
+mkdir -p $brancher_dir "$branch_repo/$current_branch"
+
+ln -sv "$branch_repo"                 "$brancher_branches_link"
+ln -sv "$branch_repo/global"          "$brancher_global_link"
+ln -sv "$branch_repo/$current_branch" "$brancher_branch_link"
+
+touch "$brancher_branch_link/$current_branch.vim"
+touch "$brancher_branch_link/$current_branch.md"
