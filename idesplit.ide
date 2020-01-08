@@ -1,8 +1,0 @@
-tmux_session_name="idesplit"
-tmux_test_pane="testpane.0"
-
-
-## Numeric array for splitting commands
-## Associative array for running commands
-## Maybe arrays for shortcut comands
-
