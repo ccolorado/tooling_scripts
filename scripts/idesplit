@@ -4,13 +4,9 @@
 #  * creates a tmux session with a predefined layout
 #  * attaches to existing session
 
-set -x
-
 DEFAULT_IDESPLIT_SESSION_NAME=dev
 DEFAULT_IDESPLIT_TEST_PANE="dev.3"
 IDESPLIT_DIRECTIVE=.idesplit.ide
-idesplit_session_name=dev
-idesplit_test_pane="dev.3"
 
 if [ -f "$IDESPLIT_DIRECTIVE" ]; then
   source $IDESPLIT_DIRECTIVE;
@@ -40,15 +36,6 @@ fi
 git rev-parse --is-inside-work-tree 2> /dev/null
 IS_GIT_PROYECT=$?
 
-echo "
-IDESPLIT_SESSION_EXISTS $IDESPLIT_SESSION_EXISTS
-idesplit_session_name   $idesplit_session_name
-idesplit_test_pane      $idesplit_test_pane
-CURRENT_SESSION_NAME    $CURRENT_SESSION_NAME
-IS_SHELL_ATTACHED       $IS_SHELL_ATTACHED
-IS_GIT_PROYECT          $IS_GIT_PROYECT
-"
-
 # If shell is attached, print some warnings if already attached
 if [ $IS_SHELL_ATTACHED -eq 0 ]; then
   echo "Can't attach to $idesplit_session_name"
@@ -61,8 +48,6 @@ if [ $IS_SHELL_ATTACHED -eq 0 ]; then
   exit 1
 fi
 
-# tmux new-session -d -n $idesplit_session_name
-echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
 tmux new -d -s $idesplit_session_name
 
 if [ "$IDESPLIT_SESSION_EXISTS" -eq 1 ]; then
