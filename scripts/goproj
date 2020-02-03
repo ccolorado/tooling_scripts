@@ -29,15 +29,15 @@ def save(ordered_list, project_dictionary, outputfile):
     project_file.write(new_file_contents)
     project_file.close()
 
-def print_list(ordered_list, project_dictionary, outputfile):
+def get_project_list(ordered_list, project_dictionary):
+    output = []
     for project_id, project_key in enumerate(ordered_list):
         project_url = project_dictionary[project_key]
-        print(f"{project_id} {project_key} {project_url}")
+        output.append(f"{project_id} {project_key} {project_url}")
+    return output
 
-# TODO parse input
-# TODO function find_project_id
-# TODO function find_project_url
-
+def print_list(ordered_list, project_dictionary):
+    print("\n".join(get_project_list(ordered_list, project_dictionary)))
 
 USER_HOME = expanduser("~")
 GOTO_PROJECT_HOME= f"{USER_HOME}/.goto_project"
@@ -109,12 +109,23 @@ if current_action == 'GOTO':
         project_key = ordered_projects[project_id]
     else:
         if project_key not in projects_available.keys():
-            print(f"project_key:{project_key} does not exist in the project list")
+            print(f"project_key:{project_key} couldn't be found on the project list")
+
+            project_list = get_project_list(ordered_projects, projects_available)
+            filter_list = list(filter(lambda project: project_key in project, project_list))
+
+            if len(filter_list) > 0:
+                print("\nPosible project matches:")
+                ## TODO highligt word
+                print("\n".join(filter_list))
+
+            print()
+            print_list(ordered_projects, projects_available)
             exit(1)
-        project_id = ordered_projects.index(project_key)
 
     project_url = projects_available[project_key]
     print(f"GOING TO: {project_key} => {project_url}")
+
     ## Bumping project
     if perform_bump:
         ordered_projects.remove(project_key)
@@ -126,5 +137,4 @@ if current_action == 'GOTO':
     os.system("/bin/bash")
 
 if current_action == 'LIST':
-    print_list(ordered_projects, projects_available, GOTO_PROJECT_CONFIG)
-i
+    print_list(ordered_projects, projects_available)
