@@ -1,81 +1,130 @@
-#!/bin/bash
+#!/bin/python
+from os.path import expanduser
+from pathlib import Path
+from  pprint import pprint
 
-GOTO_PROJECT_HOME="$HOME/.goto_project"
-GOTO_PROJECT_CONFIG="$GOTO_PROJECT_HOME/project_list"
-ACTION="LIST"
+import getopt
+import sys
+import os
 
+def is_valid_url(url):
+    if not os.path.exists(url):
+        print(f"{url} does not exists")
+        return False
+    if not os.path.isdir(url):
+        print(f"{url} is not a directory")
+        return False
+    return True
 
-if [ ! -d "$GOTO_PROJECT_HOME" ]; then
-  mkdir $GOTO_PROJECT_HOME
-fi
+def is_key_unique(key, projects):
+    return key in projects.keys()
 
-if [ ! -d "$GOTO_PROJECT_CONFIG" ]; then
-  touch $GOTO_PROJECT_CONFIG
-fi
+def save(ordered_list, project_dictionary, outputfile):
+    new_file_contents = "";
 
+    for project_id, project_key in enumerate(ordered_list):
+        project_url = project_dictionary[project_key]
+        new_file_contents += f"{project_key} {project_url}\n"
+    project_file = open(outputfile, 'w')
+    project_file.write(new_file_contents)
+    project_file.close()
 
-while getopts ":a:" option ; do
-  case $option in
-    a ) ACTON=$OPTARG ;;
-    l ) ACTION=$OPTARG ;;
-    * ) exit 1 ;;
-  esac
-done
+def print_list(ordered_list, project_dictionary, outputfile):
+    for project_id, project_key in enumerate(ordered_list):
+        project_url = project_dictionary[project_key]
+        print(f"{project_id} {project_key} {project_url}")
 
-# TODO: Implement in python or ruby
-# TODO: Create ADD option
-# TODO: BUMP selected Project to the top of the list
-# TODO: project name autocompletion # https://iridakos.com/tutorials/2018/03/01/bash-programmable-completion-tutorial.html
-#     * grep "^#$1" ~/.goto_project/project_list | cut -d'#' -f2
-
-
-CHOSEN=0
-PROJECTS=()
-LIST="" # Temporal deubg varialbe
-MENU=""; # Visual representation of list
-config_lines="$(cat $GOTO_PROJECT_CONFIG)"
-index=0
-
-while read line; do
-  if [[ $line =~ ^#.*$ ]]; then
-    LIST=$LIST"$line\n"
-    MENU=$MENU"$index "$(echo $line | sed -r 's/#/ /g')"\n"
-    PROJECTS+=("$line")
-    index=$[$index +1]
-  fi
-done <$GOTO_PROJECT_CONFIG
-
-# echo -e $LIST
-echo "      ==== MENU : $GOTO_PROJECT_CONFIG ===="
-echo -e  $MENU
+# TODO parse input
+# TODO function find_project_id
+# TODO function find_project_url
 
 
-if [[ $1 =~ ^[0-9]+$ ]] ; then
-  echo $1
-  echo ${PROJECTS[$1]}
-  CHOICE=${PROJECTS[$1]}
-  CHOSEN=1
-fi
+USER_HOME = expanduser("~")
+GOTO_PROJECT_HOME= f"{USER_HOME}/.goto_project"
+GOTO_PROJECT_CONFIG= f"{GOTO_PROJECT_HOME}/project_list"
+DEFAULT_ACTION="LIST"
 
-if [ $CHOSEN -eq 1 ]; then
+Path(GOTO_PROJECT_HOME).mkdir(parents=True, exist_ok=True)
+Path(GOTO_PROJECT_CONFIG).touch()
 
-  DATA="$(echo $CHOICE | sed -r 's/#//g')"
-  PROJECT_NAME=$(echo $DATA | cut -d ' ' -f1)
-  PROJECT_DIRECTORY=$(echo $DATA | cut -d ' ' -f2)
-  echo "loading $PROJECT_NAME >> $PROJECT_DIRECTORY"
-  if [ -d $PROJECT_DIRECTORY ]; then
+ordered_projects = []
+projects_available =  {}
+perform_bump = False
 
-    if [ "$(pwd)" = "$PROJECT_DIRECTORY" ]; then
-      echo "Aborting, changing directory is the same as the current one"
-      exit 0
-    else
-      cd $PROJECT_DIRECTORY
-      exec bash
-    fi
+## getopts
+current_action = DEFAULT_ACTION
 
-  else
-    echo "Project $PROJECT_NAME's directory $PROJECT_DIRECTORY, doesnt exists"
-    exit 1
-  fi
+options, remainder = getopt.getopt(sys.argv[1:], 'a', [])
+for opt, arg in options:
+    if opt in ('-a', '--add'):
+        current_action = 'ADD'
+    if opt in ('-d', '--delete'):
+        current_action = 'DELETE'
+    if opt in ('-b', '--bump'):
+        perform_bump = True
+if current_action == 'LIST' and len(remainder) > 0:
+    current_action = 'GOTO'
 
-fi
+### Prase input
+
+## Load projects
+projects_fp = open(GOTO_PROJECT_CONFIG, 'r')
+Lines = projects_fp.readlines()
+
+for line in Lines:
+    if not line.startswith('#'):
+        project = line.split(' ', 1)
+        if len(project) == 2:
+            project_key = project[0].strip()
+            project_url = project[1].strip()
+            ordered_projects.append(project_key)
+            projects_available[project_key] = project_url
+
+
+## Actions
+if current_action == 'ADD':
+    new_project_key = remainder[0]
+    new_project_url = remainder[1]
+    # pprint([new_project_key, new_project_url])
+    if is_key_unique(new_project_key, projects_available):
+        print(f"{new_project_key} already exists use -c or --change to avoid accidental overrides")
+        print(f" {new_project_key} => {projects_available[new_project_key]}")
+        exit(1)
+    if not is_valid_url(new_project_url):
+        exit(1)
+    ordered_projects.insert(0, new_project_key)
+    projects_available[new_project_key] = new_project_url
+    # pprint(ordered_projects)
+    # pprint(projects_available)
+    save(ordered_projects, projects_available, GOTO_PROJECT_CONFIG)
+
+if current_action == 'GOTO':
+    lookup = remainder[0]
+    project_key = lookup
+    if lookup.isdigit():
+        project_id = int(lookup)
+        if project_id > len(ordered_projects):
+            print(f"project_id:{project_id} does not exist in the project list")
+            exit(1)
+        project_key = ordered_projects[project_id]
+    else:
+        if project_key not in projects_available.keys():
+            print(f"project_key:{project_key} does not exist in the project list")
+            exit(1)
+        project_id = ordered_projects.index(project_key)
+
+    project_url = projects_available[project_key]
+    print(f"GOING TO: {project_key} => {project_url}")
+    ## Bumping project
+    if perform_bump:
+        ordered_projects.remove(project_key)
+        ordered_projects.insert(0, project_key)
+        save(ordered_projects, projects_available, GOTO_PROJECT_CONFIG)
+
+    # change_directory(project_url);
+    os.chdir(project_url)
+    os.system("/bin/bash")
+
+if current_action == 'LIST':
+    print_list(ordered_projects, projects_available, GOTO_PROJECT_CONFIG)
+i
