@@ -1,43 +1,60 @@
 #!/bin/python
+
 from os.path import expanduser
 from pathlib import Path
-from  pprint import pprint
+from pprint import pprint
 
 import getopt
 import sys
 import os
 
-def is_valid_url(url):
-    if not os.path.exists(url):
-        print(f"{url} does not exists")
-        return False
-    if not os.path.isdir(url):
-        print(f"{url} is not a directory")
-        return False
-    return True
 
-def is_key_unique(key, projects):
-    return key in projects.keys()
+class ProjectList:
+    project_ordered_keys = []
+    projects_list = {}
 
-def save(ordered_list, project_dictionary, outputfile):
-    new_file_contents = "";
+    @staticmethod
+    def is_valid_uri(uri):
+        if not os.path.exists(uri):
+            print(f"{uri} does not exists")
+            return False
+        if not os.path.isdir(uri):
+            print(f"{uri} is not a directory")
+            return False
+        return True
 
-    for project_id, project_key in enumerate(ordered_list):
-        project_url = project_dictionary[project_key]
-        new_file_contents += f"{project_key} {project_url}\n"
-    project_file = open(outputfile, 'w')
-    project_file.write(new_file_contents)
-    project_file.close()
 
-def get_project_list(ordered_list, project_dictionary):
-    output = []
-    for project_id, project_key in enumerate(ordered_list):
-        project_url = project_dictionary[project_key]
-        output.append(f"{project_id} {project_key} {project_url}")
-    return output
+    @staticmethod
+    def is_key_unique(key, projects):
+        return key in projects.keys()
 
-def print_list(ordered_list, project_dictionary):
-    print("\n".join(get_project_list(ordered_list, project_dictionary)))
+    @staticmethod
+    def save(ordered_list, project_dictionary, outputfile):
+        new_file_contents = "";
+
+        for project_id, project_key in enumerate(ordered_list):
+            project_url = project_dictionary[project_key]
+            new_file_contents += f"{project_key} {project_url}\n"
+        project_file = open(outputfile, 'w')
+        project_file.write(new_file_contents)
+        project_file.close()
+
+    @staticmethod
+    def get_project_list(ordered_list, project_dictionary):
+        output = []
+        for project_id, project_key in enumerate(ordered_list):
+            project_url = project_dictionary[project_key]
+            output.append(f"{project_id} {project_key} {project_url}")
+        return output
+
+    @staticmethod
+    def print_list(ordered_list, project_dictionary):
+        print("\n".join(
+            ProjectList.get_project_list(
+                ordered_list,
+                project_dictionary
+            )
+        ))
 
 USER_HOME = expanduser("~")
 GOTO_PROJECT_HOME= f"{USER_HOME}/.goto_project"
@@ -61,6 +78,8 @@ for opt, arg in options:
     if opt in ('-d', '--delete'):
         current_action = 'DELETE'
     if opt in ('-b', '--bump'):
+        perform_bump = True
+    if opt in ('-s', '--s'):
         perform_bump = True
 if current_action == 'LIST' and len(remainder) > 0:
     current_action = 'GOTO'
@@ -138,3 +157,5 @@ if current_action == 'GOTO':
 
 if current_action == 'LIST':
     print_list(ordered_projects, projects_available)
+
+if __name__ == "__main__"

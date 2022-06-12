@@ -1,9 +1,32 @@
 import unittest
+import tempfile
+from ...scripts.goproj import ProjectList
 
 class GoprojTest(unittest.TestCase):
 
-    # def test_is_valid_url_validates_path_exists():
-    # def test_is_valid_url_validates_path_is_directory():
+    def test_is_valid_uri_validates_path_exists(self):
+        inexistent_path = '/notExistenDir/tmp'
+        # existing_path = '/tmp'
+        existing_path = tempfile.TemporaryFile()
+        pprint.pprint(existing_path.name)
+
+        should_be_false = ProjectList.is_valid_uri(inexistent_path)
+        should_be_true = ProjectList.is_valid_uri(existing_path.name)
+
+        self.assetFalse(should_be_false)
+        self.assetTrue(should_be_true)
+
+    def test_is_valid_url_validates_path_is_directory(self):
+
+        existing_path = tempfile.TemporaryDirectory()
+        pprint.pprint(existing_path.name)
+
+        should_be_false = ProjectList.is_valid_uri(inexistent_path)
+        should_be_true = ProjectList.is_valid_uri(existing_path.name)
+        self.assetFalse(should_be_false)
+
+        self.assetTrue(should_be_true)
+
     # def test_key_exists_validates_key_exists():
     # def test_save_stores_list_in_file():
     # def test_save_stores_list_in_correct_order():

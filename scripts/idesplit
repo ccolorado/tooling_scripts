@@ -27,6 +27,7 @@ fi;
 
 # Get current tmux session's name
 CURRENT_SESSION_NAME=$(tmux display-message -p '#S')
+TMUX_ENVIRONMENT=$(env|grep -i tmux)
 IS_SHELL_ATTACHED=$?
 
 if [ $IS_SHELL_ATTACHED -eq 1 ]; then
