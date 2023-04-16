@@ -1,32 +1,42 @@
 #!/bin/bash
 
-# Will continue trying to download an url playlist until it stops changing its checksum
+# Helps downlaoding lists of videos from a file using COMMAND
+# Will go trougth the list of urls downloading the videos and checking the list for changes.
+# Will keep procesisng the list again until no further change to the list is detected.
 
-type youtube-dl > /dev/null
+# COMMAND="youtube-dl"
+COMMAND="yt-dlp"
+type $COMMAND > /dev/null
 if [ "$?" -ne "0" ];
 then
-  echo "youtube-dl could not be found on your system"
+  echo "$COMMAND could not be found on your system"
   exit 1
 fi
 
 counter=0
 PLAYLIST_FILENAME=$1
 
+if [ "" == "$1" ]; then
+  PLAYLIST_FILENAME=playlist
+fi
+echo "PL: "$PLAYLIST_FILENAME
+
 while true;
 do
   echo "Starting download run #$counter"
-  youtube-dl -q -a "$PLAYLIST_FILENAME"
   NEW_MD5=$(md5sum "$PLAYLIST_FILENAME")
+  $COMMAND -a "$PLAYLIST_FILENAME"
 
   if [ "$NEW_MD5" == "$OLD_MD5" ];
   then
     echo "No more urls to download"
+    # TODO call itself or make a function;
+    echo -e "\n\n\n\nRECURSION IS RECURSIVE\n\n\n"
+    echo "$0 $1"
+    # $($0 $1)
     exit 0
   fi
 
   OLD_MD5=$NEW_MD5
   counter=$((counter+1))
 done
-
-
-

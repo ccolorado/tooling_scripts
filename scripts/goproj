@@ -1,61 +1,63 @@
 #!/bin/python
 
+# TODO add options -c change -u update
+# * Add completion "https://kislyuk.github.io/argcomplete/#specifying-completers"
+# * Handle empty directory or '.' as working directory
+
 from os.path import expanduser
 from pathlib import Path
 from pprint import pprint
+from pygit2 import Repository
+from subprocess import call
 
 import getopt
 import sys
 import os
 
+def is_valid_url(url):
+    if not os.path.exists(url):
+        print(f"{url} does not exists")
+        return False
+    if not os.path.isdir(url):
+        print(f"{url} is not a directory")
+        return False
+    return True
 
-class ProjectList:
-    project_ordered_keys = []
-    projects_list = {}
+def is_key_unique(key, projects):
+    return key in projects.keys()
 
-    @staticmethod
-    def is_valid_uri(uri):
-        if not os.path.exists(uri):
-            print(f"{uri} does not exists")
-            return False
-        if not os.path.isdir(uri):
-            print(f"{uri} is not a directory")
-            return False
-        return True
+def save(ordered_list, project_dictionary, outputfile):
+    new_file_contents = "";
+
+    for project_id, project_key in enumerate(ordered_list):
+        project_url = project_dictionary[project_key]
+        new_file_contents += f"{project_key} {project_url}\n"
+    project_file = open(outputfile, 'w')
+    project_file.write(new_file_contents)
+    project_file.close()
+
+def get_project_list(ordered_list, project_dictionary, getBranch=False):
+    output = []
+    for project_id, project_key in enumerate(ordered_list):
+        project_url = project_dictionary[project_key]
+        project_branch = ""
+
+        if getBranch:
+            if os.path.exists(project_url+'/.git/'):
+                try :
+                    repo = Repository(project_url)
+                    project_branch = '-- ' + repo.head.name.replace('refs/heads/','')
+                except:
+                    project_branch = "N/A"
+
+        output.append(f"{project_id} {project_key} {project_url} { project_branch }")
+    return output
+
+def print_list(ordered_list, project_dictionary):
+    print("\n".join(get_project_list(ordered_list, project_dictionary, True)))
 
 
-    @staticmethod
-    def is_key_unique(key, projects):
-        return key in projects.keys()
-
-    @staticmethod
-    def save(ordered_list, project_dictionary, outputfile):
-        new_file_contents = "";
-
-        for project_id, project_key in enumerate(ordered_list):
-            project_url = project_dictionary[project_key]
-            new_file_contents += f"{project_key} {project_url}\n"
-        project_file = open(outputfile, 'w')
-        project_file.write(new_file_contents)
-        project_file.close()
-
-    @staticmethod
-    def get_project_list(ordered_list, project_dictionary):
-        output = []
-        for project_id, project_key in enumerate(ordered_list):
-            project_url = project_dictionary[project_key]
-            output.append(f"{project_id} {project_key} {project_url}")
-        return output
-
-    @staticmethod
-    def print_list(ordered_list, project_dictionary):
-        print("\n".join(
-            ProjectList.get_project_list(
-                ordered_list,
-                project_dictionary
-            )
-        ))
-
+EDITOR= os.environ.get('EDITOR', 'vim')
 USER_HOME = expanduser("~")
 GOTO_PROJECT_HOME= f"{USER_HOME}/.goto_project"
 GOTO_PROJECT_CONFIG= f"{GOTO_PROJECT_HOME}/project_list"
@@ -68,25 +70,43 @@ ordered_projects = []
 projects_available =  {}
 perform_bump = False
 
-## getopts
+# getopts
 current_action = DEFAULT_ACTION
 
-options, remainder = getopt.getopt(sys.argv[1:], 'a', [])
+try:
+    options, arg_remainder = getopt.getopt(sys.argv[1:], 'abdehsl', [])
+except getopt.GetoptError as e:
+    print(e)
+    options = [('-h', '')]
+
+
 for opt, arg in options:
     if opt in ('-a', '--add'):
         current_action = 'ADD'
-    if opt in ('-d', '--delete'):
-        current_action = 'DELETE'
+
     if opt in ('-b', '--bump'):
         perform_bump = True
-    if opt in ('-s', '--s'):
-        perform_bump = True
-if current_action == 'LIST' and len(remainder) > 0:
+
+    if opt in ('-d', '--delete'):
+        current_action = 'DELETE'
+
+    if opt in ('-e', '--list'):
+        current_action = 'EDIT'
+
+    if opt in ('-l', '--list'):
+        current_action = 'LIST'
+
+    if opt in ('-h', '--help'):
+        current_action = 'HELP'
+
+    if opt in ('-s', '--show'):
+        current_action = 'SHOW'
+
+
+if current_action == 'LIST' and len(arg_remainder) > 0:
     current_action = 'GOTO'
 
-### Prase input
-
-## Load projects
+# Load projects
 projects_fp = open(GOTO_PROJECT_CONFIG, 'r')
 Lines = projects_fp.readlines()
 
@@ -100,10 +120,27 @@ for line in Lines:
             projects_available[project_key] = project_url
 
 
-## Actions
+# Actions
+if current_action == 'HELP':
+    print("Helps handling workplaces assigning them a key as a shortcut")
+    print("goproj can take help you switch between a given list of directories using")
+    print("keys or numbers to indicate the choosen item on the lest.")
+    print("                          Show the list of paths configured")
+    print("      -h --help           Show this help text")
+    print("      -a --add KEY PATH   Adds the current path to the top of the workspace list (FILO)")
+    print("      -b --bump PATH      bumps the given path to the top of the list")
+    print("      -d --delete PATH    delets the path")
+    print("      -e                  Open Config file on editor")
+    print("      -l --list           Show the list of paths configured")
+    print("      -s --show PATH_ID   gets the directory of the selected workspace")
+
 if current_action == 'ADD':
-    new_project_key = remainder[0]
-    new_project_url = remainder[1]
+
+    pprint(arg_remainder)
+
+    new_project_key = arg_remainder[0]
+    new_project_url = arg_remainder[1]
+
     # pprint([new_project_key, new_project_url])
     if is_key_unique(new_project_key, projects_available):
         print(f"{new_project_key} already exists use -c or --change to avoid accidental overrides")
@@ -118,7 +155,7 @@ if current_action == 'ADD':
     save(ordered_projects, projects_available, GOTO_PROJECT_CONFIG)
 
 if current_action == 'GOTO':
-    lookup = remainder[0]
+    lookup = arg_remainder[0]
     project_key = lookup
     if lookup.isdigit():
         project_id = int(lookup)
@@ -135,7 +172,7 @@ if current_action == 'GOTO':
 
             if len(filter_list) > 0:
                 print("\nPosible project matches:")
-                ## TODO highligt word
+                # TODO highligt word
                 print("\n".join(filter_list))
 
             print()
@@ -145,7 +182,7 @@ if current_action == 'GOTO':
     project_url = projects_available[project_key]
     print(f"GOING TO: {project_key} => {project_url}")
 
-    ## Bumping project
+    # Bumping project
     if perform_bump:
         ordered_projects.remove(project_key)
         ordered_projects.insert(0, project_key)
@@ -158,4 +195,8 @@ if current_action == 'GOTO':
 if current_action == 'LIST':
     print_list(ordered_projects, projects_available)
 
-if __name__ == "__main__"
+if current_action == 'SHOW':
+    print(projects_available[arg_remainder[0]])
+
+if current_action == 'EDIT':
+    call([EDITOR, GOTO_PROJECT_CONFIG])
