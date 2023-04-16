@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Opens scripts on ~/bin with vim
+# Implements autocompletion
+
+declare -a COMMANDS=($(ls -1 ~/bin/))
+# declare -a COMMANDS=(foo bar blah)
+
+# ---- Completion Start----
+# complete -C vimexec vimexec
+
+if [[ -n $COMP_LINE ]]; then
+  for c in ${COMMANDS[@]}; do
+    [[ ${c:0:${#2}} == $2 ]] && echo "$c"
+  done
+  exit
+fi
+# ---- Completion End ----
+
+
+look_up=$(type $1)
+success=$?
+
+if [ "$success" -eq "0" ]; then
+  file=$(echo $look_up | cut -d " " -f3)
+  echo $file
+  file_dirname=$(dirname $file)
+  allowed_dirname="$HOME/bin"
+
+  if [ "$file_dirname" == "$allowed_dirname" ]; then
+    vim $file
+    exit 0
+  fi
+
+  echo "$file is not in $allowed_dirname"
+  exit 1
+fi
+
+echo $look_up

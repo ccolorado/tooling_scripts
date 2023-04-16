@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Scripts that opens a tmux session for development or testing
+# depends on goproj
+
+PROJECT_KEY="${1:0}"
+PROJECT_DIRECTORY=$(goproj -s $PROJECT_KEY)
+DEV_SESSION_NAME=dev
+TEST_SESSION_NAME=tester
+
+ATTACH_TO=false
+
+echo "d dev devel develop" | grep -w $1
+attach_to_dev=$?
+
+echo "t test tester testing" | grep -w $1
+attach_to_test=$?
+
+if [ $attach_to_dev -eq 0 ];
+then
+  ATTACH_TO="dev"
+fi
+
+if [ $attach_to_test -eq 0 ];
+then
+  ATTACH_TO="tester"
+fi
+
+tmux has-session -t $DEV_SESSION_NAME > /dev/null
+dev_session_exists=$?
+
+if [ "$dev_session_exists" -ne "0" ];
+then
+  echo "Launcing DEV session"
+  tmux -2 new-session -d -s $DEV_SESSION_NAME -c $PROJECT_DIRECTORY
+  # tmux split-window -v -p 20 -t $DEV_SESSION_NAME.0
+fi;
+
+tmux has-session -t $TEST_SESSION_NAME > /dev/null
+test_session_exists=$?
+
+if [ "$test_session_exists" -ne "0" ];
+then
+  echo "Launcing TEST session"
+  cd $PROJECT_DIRECTORY
+  tmux -2 new-session -d -s $TEST_SESSION_NAME -c $PROJECT_DIRECTORY
+  # tmux new-window -t $TEST_SESSION_NAME
+  tmux split-window -v -p 20 -t $TEST_SESSION_NAME:0
+  # # tmux send-keys -t $TEST_SESSION_NAME:1.0 "./eth-utils/ganache-cli-wrapper" C-m
+  # tmux send-keys -t $TEST_SESSION_NAME:1.0 "npm run private-network-no-limit" C-m
+  sleep 1
+  tmux send-keys -t $TEST_SESSION_NAME:0.0 "npx hardhat watch retest" C-m
+  tmux send-keys -t $TEST_SESSION_NAME:0.1 "gitstatusnotifier" C-m
+  tmux select-window -t $TEST_SESSION_NAME:0.0
+fi;
+
+if [ "$ATTACH_TO" == false ];
+then
+  tmux ls
+  exit 0
+fi
+
+tmux attach -t $ATTACH_TO
