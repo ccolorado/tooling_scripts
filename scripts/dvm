@@ -9,24 +9,34 @@
 # upsert maight not be self explanatory so it connects to a brand
 # new container by destroying it if it exists
 
-INIT_CONFIG_FILE=".denv"
+INIT_CONFIG_FILE="./.denv"
 INIT_CONFIG_TEMPLATE="
-STORAGE_DIR=\"\"\nMOUNTPOINT_DIR=\"/app\"\nIMAGE_NAME=\"\"\nCONTAINER_NAME=\"\""
+STORAGE_DIR=\"\"\nMOUNTPOINT_DIR=\"/app\"\nIMAGE_NAME=\"\"\nCONTAINER_NAME=\"\"\nDVM_CACHE=\"\""
 
 # Define functions for each action
 
 function create_container {
-  # mayber needs validation
-  docker build --no-cache -t $IMAGE_NAME .
+  cache=""
+  if [ "$DVM_CACHE" -eq "false" ]; then
+    cache="--no-cache"
+  fi
+
+  docker build $cache -t $IMAGE_NAME .
   # TODO: only include -v if declared
   # docker create --name $CONTAINER_NAME -v $STORAGE_DIR:$MOUNTPOINT_DIR $IMAGE_NAME
 }
 
 function start_container {
+
+  volume=""
+  if [ -n "$STORAGE_DIR"  &&  -n "$MOUNTPOINT_DIR"  && ]; then
+    valume="-v $STORAGE_DIR/:$MOUNTPOINT_DIR/"
+  fi
+
   # test first if running container exists
   # CONTAINER_ID=$(docker ps --filter name=$CONTAINER_NAME -q)
   # docker start $CONTAINER_NAME
-  docker run --detach -it --name $CONTAINER_NAME -v $STORAGE_DIR/:$MOUNTPOINT_DIR/ $IMAGE_NAME
+  docker run --detach -it --name $CONTAINER_NAME $volume $IMAGE_NAME
 }
 
 function connect_container {
@@ -35,30 +45,32 @@ function connect_container {
 
 function stop_container {
 
-  # INSTANCE_RECORD=$(docker ps -a --filter name=$CONTAINER_NAME)
+  instance_record=$(docker ps -q -a --filter name=$CONTAINER_NAME)
 
-  # if [[ -z "$CONTAINER_ID" ]]; then
-  #   echo "Container doesn't exists"
-  #   exit 1
-  # fi
+  if [ -n "$instance_record" ]; then
 
-  # container_status=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
+    container_status=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
 
-  # if [ "$container_status" = "true" ]; then
-  #   echo "Stopping containter"
-  #   echo -e "\r\nStopping container..."
-  #   echo $INSTANCE_RECORD
-  #   docker stop $CONTAINER_ID
+    if [ "$container_status" == "true" ]; then
+      echo "Stopping containter"
+      echo -e "\r\nStopping container..."
+      echo $instance_record
+      docker stop $instance_record
+    fi
+  else
+    echo "Container doesn't exists"
+  fi
 
-  #   echo "Retry to destroy container"
-  # fi
-
-
-  docker stop $CONTAINER_NAME
 }
 
 function destroy_container {
 
+  instance_record=$(docker ps -q -a --filter name=$CONTAINER_NAME)
+
+  if [ -n "$instance_record" ]; then
+    docker rm $CONTAINER_NAME
+    docker rmi $IMAGE_NAME
+  fi;
 
   # CONTAINER_ID=$(docker ps -a --filter name=$CONTAINER_NAME -q)
   # INSTANCE_RECORD=$(docker ps -a --filter name=$CONTAINER_NAME)
@@ -78,25 +90,20 @@ function destroy_container {
   # docker ps -a
 
 
-  docker stop $CONTAINER_NAME
-  docker rm $CONTAINER_NAME
-  docker rmi $IMAGE_NAME
 }
 
 function upsert_container {
-  set -x
-  visibleStep "Stopping existing container"
+  visibleStep "1/5 Stopping existing container"
   stop_container
-  visibleStep "Destroying existing container"
+  visibleStep "2/5 Destroying existing container"
   destroy_container
-  visibleStep "Creating container"
+  visibleStep "3/5 Creating container"
   create_container
-  visibleStep "Starting container"
+  visibleStep "4/5 Starting container"
   start_container
-  visibleStep "Connecting container"
+  visibleStep "5/5 Connecting container"
   connect_container
   visibleStep "dvm upsert finish"
-  set +x
 }
 
 function init_dvm {
@@ -105,19 +112,27 @@ function init_dvm {
 }
 
 function visibleStep {
-  # if [ "$is_powershell_installed" -eq "0" ]; then
+  if [ "$is_powershell_installed" -eq "0" ]; then
     powershell.exe '[console]::beep(261.6,700)'
-  # fi
-
-  echo -e ">>>>\t $1\n\n\n\n"
+  fi
+  echo -e "\n\n\n\n>>>>\t $1"
   sleep 2
 }
 
+# wsl beep
 type powershell.exe &> /dev/null
 is_powershell_installed=$?
 
-test $INIT_CONFIG_FILE || source $INIT_CONFIG_FILE
+if [ ! -f "$INIT_CONFIG_FILE" ]; then
+  echo "Config file $INIT_CONFIG_FILE not found"
+  echo "Please run: $0 init"
+  exit 5
+fi
 
+source $INIT_CONFIG_FILE
+
+set -e
+set -x
 # Check command argument and call the corresponding function
 case "$1" in
   "create")
