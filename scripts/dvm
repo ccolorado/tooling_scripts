@@ -1,0 +1,149 @@
+#!/bin/bash
+
+# dvm, short for docker virtual machine is a helper script docker
+# helper script for docker that helps abstracting docker commands
+# to be used like a discardable clean environment.
+#
+# Supports actions: create, start, connect, stop, destroy and upsert
+#
+# upsert maight not be self explanatory so it connects to a brand
+# new container by destroying it if it exists
+
+INIT_CONFIG_FILE=".denv"
+INIT_CONFIG_TEMPLATE="
+STORAGE_DIR=\"\"\nMOUNTPOINT_DIR=\"/app\"\nIMAGE_NAME=\"\"\nCONTAINER_NAME=\"\""
+
+# Define functions for each action
+
+function create_container {
+  # mayber needs validation
+  docker build --no-cache -t $IMAGE_NAME .
+  # TODO: only include -v if declared
+  # docker create --name $CONTAINER_NAME -v $STORAGE_DIR:$MOUNTPOINT_DIR $IMAGE_NAME
+}
+
+function start_container {
+  # test first if running container exists
+  # CONTAINER_ID=$(docker ps --filter name=$CONTAINER_NAME -q)
+  # docker start $CONTAINER_NAME
+  docker run --detach -it --name $CONTAINER_NAME -v $STORAGE_DIR/:$MOUNTPOINT_DIR/ $IMAGE_NAME
+}
+
+function connect_container {
+  docker exec -it $CONTAINER_NAME /bin/bash
+}
+
+function stop_container {
+
+  # INSTANCE_RECORD=$(docker ps -a --filter name=$CONTAINER_NAME)
+
+  # if [[ -z "$CONTAINER_ID" ]]; then
+  #   echo "Container doesn't exists"
+  #   exit 1
+  # fi
+
+  # container_status=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
+
+  # if [ "$container_status" = "true" ]; then
+  #   echo "Stopping containter"
+  #   echo -e "\r\nStopping container..."
+  #   echo $INSTANCE_RECORD
+  #   docker stop $CONTAINER_ID
+
+  #   echo "Retry to destroy container"
+  # fi
+
+
+  docker stop $CONTAINER_NAME
+}
+
+function destroy_container {
+
+
+  # CONTAINER_ID=$(docker ps -a --filter name=$CONTAINER_NAME -q)
+  # INSTANCE_RECORD=$(docker ps -a --filter name=$CONTAINER_NAME)
+
+  # if [[ -z "$CONTAINER_ID" ]]; then
+  #   echo "Container doesn't exists"
+  #   exit 1
+  # fi
+
+  # echo -e "\r\nDestroying Container"
+
+  # echo $INSTANCE_RECORD
+  # docker rm $CONTAINER_ID
+  # docker rmi $IMAGE_NAME
+
+  # echo "Active containers:"
+  # docker ps -a
+
+
+  docker stop $CONTAINER_NAME
+  docker rm $CONTAINER_NAME
+  docker rmi $IMAGE_NAME
+}
+
+function upsert_container {
+  set -x
+  visibleStep "Stopping existing container"
+  stop_container
+  visibleStep "Destroying existing container"
+  destroy_container
+  visibleStep "Creating container"
+  create_container
+  visibleStep "Starting container"
+  start_container
+  visibleStep "Connecting container"
+  connect_container
+  visibleStep "dvm upsert finish"
+  set +x
+}
+
+function init_dvm {
+  test -e $INIT_CONFIG_FILE || echo -e $INIT_CONFIG_TEMPLATE > $INIT_CONFIG_FILE
+  $EDITOR $INIT_CONFIG_FILE
+}
+
+function visibleStep {
+  # if [ "$is_powershell_installed" -eq "0" ]; then
+    powershell.exe '[console]::beep(261.6,700)'
+  # fi
+
+  echo -e ">>>>\t $1\n\n\n\n"
+  sleep 2
+}
+
+type powershell.exe &> /dev/null
+is_powershell_installed=$?
+
+test $INIT_CONFIG_FILE || source $INIT_CONFIG_FILE
+
+# Check command argument and call the corresponding function
+case "$1" in
+  "create")
+    create_container
+    ;;
+  "start")
+    start_container
+    ;;
+  "connect")
+    connect_container
+    ;;
+  "stop")
+    stop_container
+    ;;
+  "destroy")
+    destroy_container
+    ;;
+  "upsert")
+    upsert_container
+    ;;
+  "init")
+    init_dvm
+    ;;
+  *)
+    echo "Error: Invalid command. Please use create, start, connect, stop, destroy, or upsert."
+    exit 1
+esac
+
+exit 0
