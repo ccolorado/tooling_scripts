@@ -17,26 +17,32 @@ STORAGE_DIR=\"\"\nMOUNTPOINT_DIR=\"/app\"\nIMAGE_NAME=\"\"\nCONTAINER_NAME=\"\"\
 
 function create_container {
   cache=""
-  if [ "$DVM_CACHE" -eq "false" ]; then
+  DVM_CACHE_FLAG="false"
+  if [ "$DVM_CACHE" = "$DVM_CACHE_FLAG" ]; then
     cache="--no-cache"
   fi
 
   docker build $cache -t $IMAGE_NAME .
   # TODO: only include -v if declared
-  # docker create --name $CONTAINER_NAME -v $STORAGE_DIR:$MOUNTPOINT_DIR $IMAGE_NAME
+  docker create --name $CONTAINER_NAME -v $STORAGE_DIR:$MOUNTPOINT_DIR $IMAGE_NAME
 }
 
 function start_container {
 
-  volume=""
-  if [ -n "$STORAGE_DIR"  &&  -n "$MOUNTPOINT_DIR"  && ]; then
-    valume="-v $STORAGE_DIR/:$MOUNTPOINT_DIR/"
+  volume="-v $STORAGE_DIR/:$MOUNTPOINT_DIR/"
+  if [[ -n "${STORAGE_DIR}" && -n "${MOUNTPOINT_DIR}" ]]; then
+    echo "volumes"
+    volume="-v $STORAGE_DIR/:$MOUNTPOINT_DIR/"
+  else
+    echo "no volumes"
   fi
 
-  # test first if running container exists
-  # CONTAINER_ID=$(docker ps --filter name=$CONTAINER_NAME -q)
-  # docker start $CONTAINER_NAME
-  docker run --detach -it --name $CONTAINER_NAME $volume $IMAGE_NAME
+  # Check if the container exists
+  if [[ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]]; then
+    docker start $CONTAINER_NAME
+  else
+    docker run --detach -it --name $CONTAINER_NAME $volume $IMAGE_NAME
+  fi
 }
 
 function connect_container {
@@ -66,6 +72,7 @@ function stop_container {
 function destroy_container {
 
   instance_record=$(docker ps -q -a --filter name=$CONTAINER_NAME)
+  # container_status=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
 
   if [ -n "$instance_record" ]; then
     docker rm $CONTAINER_NAME
@@ -97,7 +104,7 @@ function upsert_container {
   stop_container
   visibleStep "2/5 Destroying existing container"
   destroy_container
-  visibleStep "3/5 Creating container"
+  visibleStep "3/5 Building container"
   create_container
   visibleStep "4/5 Starting container"
   start_container
@@ -131,8 +138,6 @@ fi
 
 source $INIT_CONFIG_FILE
 
-set -e
-set -x
 # Check command argument and call the corresponding function
 case "$1" in
   "create")
