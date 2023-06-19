@@ -9,11 +9,28 @@
 # upsert maight not be self explanatory so it connects to a brand
 # new container by destroying it if it exists
 
+# TODO: add override commands
 INIT_CONFIG_FILE="./.denv"
+LOG_FILE=$INIT_CONFIG_FILE"_log"
 INIT_CONFIG_TEMPLATE="
-STORAGE_DIR=\"\"\nMOUNTPOINT_DIR=\"/app\"\nIMAGE_NAME=\"\"\nCONTAINER_NAME=\"\"\nDVM_CACHE=\"\""
+STORAGE_DIR=\"\"\nMOUNTPOINT_DIR=\"/app\"\nIMAGE_NAME=\"\"\nCONTAINER_NAME=\"\"\nDVM_CACHE=\"\"\nCONNECT=\"\"\nCREATE=\"\"\nDESTROY=\"\"\nSTART=\"\"\nSTOP=\"\""
+
+
+function log_message {
+  echo $1 >> $LOG_FILE
+}
 
 # Define functions for each action
+function run_cmd {
+  log_message "$(date +%s) $1"
+  eval $1
+  exit_status=$?
+
+  if [ "$exit_status" -ne "0" ]; then
+    log_message "$(date +%s) [EXIT_STATUS:$exit_status]"
+    exit $exit_status
+  fi;
+}
 
 function create_container {
   cache=""
@@ -22,9 +39,11 @@ function create_container {
     cache="--no-cache"
   fi
 
-  docker build $cache -t $IMAGE_NAME .
+  run_cmd "docker build $cache -t $CONTAINER_NAME:$IMAGE_NAME ."
+
+
   # TODO: only include -v if declared
-  docker create --name $CONTAINER_NAME -v $STORAGE_DIR:$MOUNTPOINT_DIR $IMAGE_NAME
+  # docker create --name $CONTAINER_NAME -v $STORAGE_DIR:$MOUNTPOINT_DIR $IMAGE_NAME
 }
 
 function start_container {
@@ -39,14 +58,16 @@ function start_container {
 
   # Check if the container exists
   if [[ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]]; then
-    docker start $CONTAINER_NAME
+    echo "RESTARTING containt"
+    run_cmd "docker start $CONTAINER_NAME"
   else
-    docker run --detach -it --name $CONTAINER_NAME $volume $IMAGE_NAME
+    echo "STARTING CONTAINER"
+    run_cmd "docker run -d -it --name $CONTAINER_NAME $volume $IMAGE_NAME"
   fi
 }
 
 function connect_container {
-  docker exec -it $CONTAINER_NAME /bin/bash
+  run_cmd "docker exec -it $CONTAINER_NAME /bin/bash"
 }
 
 function stop_container {
@@ -61,7 +82,7 @@ function stop_container {
       echo "Stopping containter"
       echo -e "\r\nStopping container..."
       echo $instance_record
-      docker stop $instance_record
+      run_cmd "docker stop $instance_record"
     fi
   else
     echo "Container doesn't exists"
@@ -100,9 +121,9 @@ function destroy_container {
 }
 
 function upsert_container {
-  visibleStep "1/5 Stopping existing container"
+  visibleStep "1/5 Stopping existing container if exists"
   stop_container
-  visibleStep "2/5 Destroying existing container"
+  visibleStep "2/5 Destroying existing container if exists"
   destroy_container
   visibleStep "3/5 Building container"
   create_container
@@ -119,6 +140,7 @@ function init_dvm {
 }
 
 function visibleStep {
+  log_message "$1"
   if [ "$is_powershell_installed" -eq "0" ]; then
     powershell.exe '[console]::beep(261.6,700)'
   fi
@@ -126,37 +148,40 @@ function visibleStep {
   sleep 2
 }
 
+function validateConfigFile {
+  if [ ! -f "$INIT_CONFIG_FILE" ]; then
+    echo "Config file $INIT_CONFIG_FILE not found"
+    echo "Please run: $0 init"
+    exit 5
+  fi
+}
+
 # wsl beep
 type powershell.exe &> /dev/null
 is_powershell_installed=$?
 
-if [ ! -f "$INIT_CONFIG_FILE" ]; then
-  echo "Config file $INIT_CONFIG_FILE not found"
-  echo "Please run: $0 init"
-  exit 5
-fi
 
 source $INIT_CONFIG_FILE
 
 # Check command argument and call the corresponding function
 case "$1" in
   "create")
-    create_container
+    validateConfigFile && create_container
     ;;
   "start")
-    start_container
+    validateConfigFile && start_container
     ;;
   "connect")
-    connect_container
+    validateConfigFile && connect_container
     ;;
   "stop")
-    stop_container
+    validateConfigFile && stop_container
     ;;
   "destroy")
-    destroy_container
+    validateConfigFile && destroy_container
     ;;
   "upsert")
-    upsert_container
+    validateConfigFile && upsert_container
     ;;
   "init")
     init_dvm
