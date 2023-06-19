@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Tool that implements watch features for executing commands
+# acording to filechanges, depends on inotify-tools and entr
+
+# Configuration
+# Add a list of directories on the file .multientr.env in the following format
+# directory=command {file}
+# e.g.
+# /app/assets/=echo "hello world {file}"
+
+execute_command() {
+  local directory="$1"
+  local command="$2"
+  local filename="$3"
+
+  echo "Executing command for directory: $directory"
+  local replaced_command="${command//\{file\}/$filename}"
+  eval "$replaced_command" &
+  local command_pid=$!
+
+  # Wait for the command to finish
+  wait "$command_pid"
+  echo "Command execution finished for directory: $directory"
+}
+
+# Read the configuration file and store the directory-command mappings
+declare -A directories
+
+while IFS="=" read -r directory command; do
+  directories["$directory"]="$command"
+done < ./.multientr.env
+
+# Monitor the directories for changes
+inotifywait -m "${!directories[@]}" -e modify |
+while read -r directory _ file; do
+  # Check if the modified file is in one of the monitored directories
+  if [[ -n "${directories[$directory]}" ]]; then
+    # If the command is already running, kill it
+    if [[ -n "${pids[$directory]}" ]]; then
+      echo "Killing previous command for directory: $directory"
+      kill "${pids[$directory]}"
+      wait "${pids[$directory]}"
+    fi
+
+    # Execute the command for the modified directory
+    execute_command "$directory" "${directories[$directory]}" "$file"
+    pids["$directory"]=$!
+  fi
+done
