@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# A greedy approach for searching directories code and documentation
+# this script helps search multiple directories with a single command
+# Each directory can costumize the way the search command given a
+# configuration mapping the required directory to a command template
+
+# Function to display usage instructions
+display_usage() {
+  echo "Usage: $(basename "$0") [-f] query"
+  echo "Options:"
+  echo "  -f    List only filenames where the query was found"
+}
+
+# Function to search for the query in a directory using the specified command template
+search_directory() {
+  local directory="$1"
+  local command_template="$2"
+  local query="$3"
+  local filenames_only="$4"
+
+  command_template="${command_template/\{query\}/$query}"
+
+  if [ "$filenames_only" = true ]; then
+    command="${command_template/\{onlyfiles\}/-l}"
+  else
+    command="${command_template/\{onlyfiles\}/}"
+  fi
+
+  command="$command $(realpath --relative-to=./ $current_dir/$directory)"
+
+  eval $command;
+
+}
+
+# Read the configuration file and store the directory-command mappings
+read_configuration() {
+  local config_file="$1"
+  local query="$2"
+  local filenames_only="$3"
+
+  while read -r line || [[ -n "$line" ]]; do
+    # Skip commented lines and empty lines
+    if [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]]; then
+      continue
+    fi
+
+    echo "$current_dir";
+
+    directory=$(echo "$line" | cut -d'=' -f1)
+    command_template=$(echo "$line" | cut -d'=' -f2-)
+
+    # Search in the directory using the command template
+    search_directory "$directory" "$command_template" "$query" "$filenames_only"
+  done < "$config_file"
+}
+
+# Check if the number of arguments is less than 1
+if [ "$#" -lt 1 ]; then
+  display_usage
+  exit 1
+fi
+
+# Parse command line options
+filenames_only=false
+
+while getopts ":f" opt; do
+  case $opt in
+    f)
+      filenames_only=true
+      ;;
+    \?)
+      display_usage
+      exit 1
+      ;;
+  esac
+done
+
+# Shift the command line arguments to exclude the options
+shift "$((OPTIND-1))"
+
+# Get the query from the command line arguments
+query="$1"
+
+# Get the path of the closest configuration file
+current_dir="$(realpath .)"
+script_name="greedypig"
+config_file=""
+
+while [ "$current_dir" != "/" ]; do
+  config_file="$current_dir/.$script_name.conf"
+
+  if [ -f "$config_file" ]; then
+    break
+  fi
+
+  current_dir="$(dirname "$current_dir")"
+done
+
+# If the configuration file doesn't exist, display an error message and exit
+if [ ! -f "$config_file" ]; then
+  echo "Configuration file not found."
+  exit 1
+fi
+
+# Read the configuration file and search for the query
+read_configuration "$config_file" "$query" "$filenames_only"
