@@ -13,7 +13,7 @@
 INIT_CONFIG_FILE="./.denv"
 LOG_FILE=$INIT_CONFIG_FILE"_log"
 INIT_CONFIG_TEMPLATE="
-STORAGE_DIR=\"\"\nMOUNTPOINT_DIR=\"/app\"\nIMAGE_NAME=\"\"\nCONTAINER_NAME=\"\"\nDVM_CACHE=\"\"\nCONNECT=\"\"\nCREATE=\"\"\nDESTROY=\"\"\nSTART=\"\"\nSTOP=\"\""
+DVM_STORAGE_DIR=\"\"\nDVM_MOUNTPOINT_DIR=\"/app\"\nDVM_IMAGE_NAME=\"\"\nCONTAINER_NAME=\"\"\nDVM_USE_CACHE=\"\"\nCONNECT=\"\"\nCREATE=\"\"\nDESTROY=\"\"\nSTART=\"\"\nSTOP=\"\""
 
 
 function log_message {
@@ -23,6 +23,7 @@ function log_message {
 # Define functions for each action
 function run_cmd {
   log_message "$(date +%s) $1"
+  echo "$(date +%s) $1"
   eval $1
   exit_status=$?
 
@@ -33,50 +34,48 @@ function run_cmd {
 }
 
 function create_container {
-  cache=""
-  DVM_CACHE_FLAG="false"
-  if [ "$DVM_CACHE" = "$DVM_CACHE_FLAG" ]; then
+  if [ "$DVM_USE_CACHE" = "false" ]; then
     cache="--no-cache"
   fi
 
-  run_cmd "docker build $cache -t $CONTAINER_NAME:$IMAGE_NAME ."
+  run_cmd "docker build $cache -t $DVM_IMAGE_NAME ."
 
 
   # TODO: only include -v if declared
-  # docker create --name $CONTAINER_NAME -v $STORAGE_DIR:$MOUNTPOINT_DIR $IMAGE_NAME
+  # docker create --name $DVM_CONTAINER_NAME -v $DVM_STORAGE_DIR:$DVM_MOUNTPOINT_DIR $DVM_IMAGE_NAME
 }
 
 function start_container {
 
-  volume="-v $STORAGE_DIR/:$MOUNTPOINT_DIR/"
-  if [[ -n "${STORAGE_DIR}" && -n "${MOUNTPOINT_DIR}" ]]; then
+  volume="-v $DVM_STORAGE_DIR/:$DVM_MOUNTPOINT_DIR/"
+  if [[ -n "${DVM_STORAGE_DIR}" && -n "${DVM_MOUNTPOINT_DIR}" ]]; then
     echo "volumes"
-    volume="-v $STORAGE_DIR/:$MOUNTPOINT_DIR/"
+    volume="-v $DVM_STORAGE_DIR/:$DVM_MOUNTPOINT_DIR/"
   else
     echo "no volumes"
   fi
 
   # Check if the container exists
-  if [[ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]]; then
+  if [[ "$(docker ps -aq -f name=$DVM_CONTAINER_NAME)" ]]; then
     echo "RESTARTING containt"
-    run_cmd "docker start $CONTAINER_NAME"
+    run_cmd "docker start $DVM_CONTAINER_NAME"
   else
     echo "STARTING CONTAINER"
-    run_cmd "docker run -d -it --name $CONTAINER_NAME $volume $IMAGE_NAME"
+    run_cmd "docker run -d -it --name $DVM_CONTAINER_NAME $volume $DVM_IMAGE_NAME"
   fi
 }
 
 function connect_container {
-  run_cmd "docker exec -it $CONTAINER_NAME /bin/bash"
+  run_cmd "docker exec -it $DVM_CONTAINER_NAME $CONTAINER_SHELL"
 }
 
 function stop_container {
 
-  instance_record=$(docker ps -q -a --filter name=$CONTAINER_NAME)
+  instance_record=$(docker ps -q -a --filter name=$DVM_CONTAINER_NAME)
 
   if [ -n "$instance_record" ]; then
 
-    container_status=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
+    container_status=$(docker inspect -f '{{.State.Running}}' $DVM_CONTAINER_NAME)
 
     if [ "$container_status" == "true" ]; then
       echo "Stopping containter"
@@ -92,16 +91,16 @@ function stop_container {
 
 function destroy_container {
 
-  instance_record=$(docker ps -q -a --filter name=$CONTAINER_NAME)
-  # container_status=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
+  instance_record=$(docker ps -q -a --filter name=$DVM_CONTAINER_NAME)
+  # container_status=$(docker inspect -f '{{.State.Running}}' $DVM_CONTAINER_NAME)
 
   if [ -n "$instance_record" ]; then
-    docker rm $CONTAINER_NAME
-    docker rmi $IMAGE_NAME
+    docker rm $DVM_CONTAINER_NAME
+    docker rmi $DVM_IMAGE_NAME
   fi;
 
-  # CONTAINER_ID=$(docker ps -a --filter name=$CONTAINER_NAME -q)
-  # INSTANCE_RECORD=$(docker ps -a --filter name=$CONTAINER_NAME)
+  # CONTAINER_ID=$(docker ps -a --filter name=$DVM_CONTAINER_NAME -q)
+  # INSTANCE_RECORD=$(docker ps -a --filter name=$DVM_CONTAINER_NAME)
 
   # if [[ -z "$CONTAINER_ID" ]]; then
   #   echo "Container doesn't exists"
@@ -112,7 +111,7 @@ function destroy_container {
 
   # echo $INSTANCE_RECORD
   # docker rm $CONTAINER_ID
-  # docker rmi $IMAGE_NAME
+  # docker rmi $DVM_IMAGE_NAME
 
   # echo "Active containers:"
   # docker ps -a

@@ -7,8 +7,9 @@
 # COMMAND="youtube-dl"
 COMMAND="yt-dlp"
 type $COMMAND > /dev/null
-if [ "$?" -ne "0" ];
-then
+echo "Using $COMMAND to download videos"
+
+if [ "$?" -ne "0" ]; then
   echo "$COMMAND could not be found on your system"
   exit 1
 fi
