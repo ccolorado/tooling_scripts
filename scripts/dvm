@@ -13,7 +13,7 @@
 INIT_CONFIG_FILE="./.denv"
 LOG_FILE=$INIT_CONFIG_FILE"_log"
 INIT_CONFIG_TEMPLATE="
-DVM_STORAGE_DIR=\"\"\nDVM_MOUNTPOINT_DIR=\"/app\"\nDVM_IMAGE_NAME=\"\"\nCONTAINER_NAME=\"\"\nDVM_USE_CACHE=\"\"\nCONNECT=\"\"\nCREATE=\"\"\nDESTROY=\"\"\nSTART=\"\"\nSTOP=\"\""
+DVM_STORAGE_DIR=\"\"\nDVM_MOUNTPOINT_DIR=\"/app\"\nDVM_IMAGE_NAME=\"\"\nDVM_CONTAINER_NAME=\"\"\nDVM_CONTAINER_SHELL=\"\"\nDVM_USE_CACHE=\"\"\nCONNECT=\"\"\nCREATE=\"\"\nDESTROY=\"\"\nSTART=\"\"\nSTOP=\"\""
 
 
 function log_message {
@@ -38,7 +38,7 @@ function create_container {
     cache="--no-cache"
   fi
 
-  run_cmd "docker build $cache -t $DVM_IMAGE_NAME ."
+  run_cmd "docker build $cache -t $DVM_CONTAINER_TAG ."
 
 
   # TODO: only include -v if declared
@@ -66,7 +66,7 @@ function start_container {
 }
 
 function connect_container {
-  run_cmd "docker exec -it $DVM_CONTAINER_NAME $CONTAINER_SHELL"
+  run_cmd "docker exec -it $DVM_CONTAINER_NAME $DVM_CONTAINER_SHELL"
 }
 
 function stop_container {
@@ -91,12 +91,15 @@ function stop_container {
 
 function destroy_container {
 
+  log_message "docker ps -q -a --filter name=$DVM_CONTAINER_NAME"
   instance_record=$(docker ps -q -a --filter name=$DVM_CONTAINER_NAME)
   # container_status=$(docker inspect -f '{{.State.Running}}' $DVM_CONTAINER_NAME)
 
   if [ -n "$instance_record" ]; then
-    docker rm $DVM_CONTAINER_NAME
-    docker rmi $DVM_IMAGE_NAME
+    # docker rm $DVM_CONTAINER_NAME
+    run_cmd "docker rm $DVM_CONTAINER_NAME"
+    # docker rmi $DVM_IMAGE_NAME
+    run_cmd "docker rmi $DVM_IMAGE_NAME"
   fi;
 
   # CONTAINER_ID=$(docker ps -a --filter name=$DVM_CONTAINER_NAME -q)
@@ -120,6 +123,10 @@ function destroy_container {
 }
 
 function upsert_container {
+  log_message "-----------------------"
+  log_message "| upserting container |"
+  log_message "-----------------------"
+
   visibleStep "1/5 Stopping existing container if exists"
   stop_container
   visibleStep "2/5 Destroying existing container if exists"
