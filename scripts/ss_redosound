@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Script that attempts to "kick" fix audio into working
+# kills pipewire if exists and then tries to set the bluetooth headset bluetooth.codec to ldac_sq
+# Does not validate if the devisce exists
+
+# set -x
+
+STATUS=$(pactl list | grep -e "bluetooth.codec\|bluetooth.battery" | sort | uniq)
+
+
+CODEC_FIND_CMD=$(echo "$STATUS" | grep codec | tail -1 | cut -d'=' -f2)
+BATTERY_FIND_CMD=$(echo "$STATUS" | grep battery | tail -1 | cut -d'=' -f2)
+
+# echo "__STATE_START__"
+# echo "CODEC:$CODEC_FIND_CMD"
+# echo "BATT:$BATTERY_FIND_CMD"
+# echo " CURRENT CODEC:$CODEC_FIND_CMD;"
+# echo "start"
+
+killall pipewire > /dev/null
+
+if [ "$CODEC_FIND_CMD" = " \"ldac_sq\"" ]; then
+
+  echo "Codec is already ldac_sq";
+
+else
+
+  echo "executing > "
+  echo $CODEC_FIND_CMD
+  set -x
+  pactl send-message /card/bluez_card.01_80_DE_00_0A_F7/bluez switch-codec '"ldac_sq"';
+  set +x
+
+fi
+
+
+echo "___STATE_END___"
+sleep 1
+STATUS=$(pactl list | grep -e "bluetooth.codec\|bluetooth.battery" | sort | uniq)
+NEW_CODEC_FIND_CMD=$(echo "$STATUS" | grep codec | tail -1 | cut -d'=' -f2)
+BATTERY_FIND_CMD=$(echo "$STATUS" | grep battery | tail -1 | cut -d'=' -f2)
+echo "CODEC:$CODEC_FIND_CMD -> $NEW_CODEC_FIND_CMD"
+echo "BATT:$BATTERY_FIND_CMD"
+echo $STATUS
