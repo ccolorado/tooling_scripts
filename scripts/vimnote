@@ -1,0 +1,15 @@
+#!/bin/bash
+declare -a COMMANDS=($(ls -1 $NOTES_HOME))
+
+# ---- Completion Start----
+# complete -C vimnote vimnote
+
+if [[ -n $COMP_LINE ]]; then
+  for c in ${COMMANDS[@]}; do
+    [[ ${c:0:${#2}} == $2 ]] && echo "$c"
+  done
+  exit
+fi
+# ---- Completion End ----
+
+vim -c ":e note:$1"

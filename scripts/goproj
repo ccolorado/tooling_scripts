@@ -2,7 +2,6 @@
 
 # Script that handle a list of directories to goto with alias and or indexes
 
-# TODO add options -c change -u update
 # * Add completion "https://kislyuk.github.io/argcomplete/#specifying-completers"
 # * Handle empty directory or '.' as working directory
 
@@ -58,18 +57,46 @@ def get_project_list(ordered_list, project_dictionary, getBranch=False):
 def print_list(ordered_list, project_dictionary):
     print("\n".join(get_project_list(ordered_list, project_dictionary, True)))
 
+# Configuration Constants
+# TODO: create a configuration file to define everything but the configuration
+# paths
 
+# Defines an editor
 EDITOR= os.environ.get('EDITOR', 'vim')
+# Constant for expanding user's home directory
 USER_HOME = expanduser("~")
+
+# Absolute path to the storage directory
 GOTO_PROJECT_HOME= f"{USER_HOME}/.goto_project"
+
+# Absolute path to the project list fil 
+# TODO: refactor for GOTO_PROJECT_HOME_FILE
 GOTO_PROJECT_CONFIG= f"{GOTO_PROJECT_HOME}/project_list"
+
+# Fallback action when no action is defined.
 DEFAULT_ACTION="LIST"
 
 Path(GOTO_PROJECT_HOME).mkdir(parents=True, exist_ok=True)
 Path(GOTO_PROJECT_CONFIG).touch()
 
-ordered_projects = []
+# Global Variables
+
+# TODO: document the structure and purpose of projects_available
+# projects_available: Dictionary storing the defined projects
+# Stores both the project key or alias with the path of the project.
+#
+# e.g. { 'key1': '/path/key1', 'key2': '/path/key2', 'key2', 'somealias': '/path/to/some/alias` }
+
 projects_available =  {}
+
+# ordered_projects:  List of project keys
+# This list is an ordered list of the keys corresponding to the projects
+# at projects_available. Acts as a reference to determinate the order of
+# the project list. Main use is altering the order before saving changes
+# to the GOTO_PROJECT_CONFIG
+#
+# e.g. [ 'key1', 'key2', 'somealias' ]
+ordered_projects = []
 perform_bump = False
 
 # getopts
@@ -92,7 +119,7 @@ for opt, arg in options:
     if opt in ('-d', '--delete'):
         current_action = 'DELETE'
 
-    if opt in ('-e', '--list'):
+    if opt in ('-e', '--edit'):
         current_action = 'EDIT'
 
     if opt in ('-l', '--list'):
@@ -104,15 +131,17 @@ for opt, arg in options:
     if opt in ('-s', '--show'):
         current_action = 'SHOW'
 
-
-if current_action == 'LIST' and len(arg_remainder) > 0:
+# Assumption, not changing the default_action ('LIST') while still giving
+# arguments means that the user is activating the 'GOTO' action
+if current_action == DEFAULT_ACTION and len(arg_remainder) > 0:
     current_action = 'GOTO'
 
-# Load projects
+# Load projects into ordered_projects and projects_available
 projects_fp = open(GOTO_PROJECT_CONFIG, 'r')
 Lines = projects_fp.readlines()
 
 for line in Lines:
+    # Skips commented line from the project list
     if not line.startswith('#'):
         project = line.split(' ', 1)
         if len(project) == 2:
@@ -152,13 +181,12 @@ if current_action == 'ADD':
         exit(1)
     ordered_projects.insert(0, new_project_key)
     projects_available[new_project_key] = os.path.abspath(new_project_url)
-    # pprint(ordered_projects)
-    # pprint(projects_available)
     save(ordered_projects, projects_available, GOTO_PROJECT_CONFIG)
 
 if current_action == 'GOTO':
     lookup = arg_remainder[0]
     project_key = lookup
+    # TODO: refactor numeric vs key resolv into a funciton for reusability
     if lookup.isdigit():
         project_id = int(lookup)
         if project_id > len(ordered_projects):
@@ -198,6 +226,7 @@ if current_action == 'LIST':
     print_list(ordered_projects, projects_available)
 
 if current_action == 'SHOW':
+    # TODO: enable to show path based on key
     print(projects_available[arg_remainder[0]])
 
 if current_action == 'EDIT':
