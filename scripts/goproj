@@ -151,7 +151,7 @@ if current_action == 'ADD':
     if not is_valid_url(new_project_url):
         exit(1)
     ordered_projects.insert(0, new_project_key)
-    projects_available[new_project_key] = new_project_url
+    projects_available[new_project_key] = os.path.abspath(new_project_url)
     # pprint(ordered_projects)
     # pprint(projects_available)
     save(ordered_projects, projects_available, GOTO_PROJECT_CONFIG)
