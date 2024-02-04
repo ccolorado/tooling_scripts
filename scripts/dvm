@@ -66,7 +66,7 @@ function start_container {
 }
 
 function connect_container {
-  run_cmd "docker exec -it $DVM_CONTAINER_NAME $DVM_CONTAINER_SHELL"
+  run_cmd "docker exec -w $DVM_MOUNTPOINT_DIR -it $DVM_CONTAINER_NAME $DVM_CONTAINER_SHELL"
 }
 
 function stop_container {
