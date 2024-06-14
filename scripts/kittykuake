@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Script that simulate the yakuake experiece with the kitty console.
+# TODO: make windows sizes configurable
+# TODO: make application configurable
+# TODO: use a configuration file
+# TODO: support hyprland with hdrop
+
+MODE=$1
+LOG_FILE="/tmp/kittykuake_log"
+
+function log_message {
+  echo $1
+  echo $1 >> $LOG_FILE
+}
+
+log_message "  "
+log_message "============================= NEW RUN "
+
+log_message "0: $0"
+log_message "1: $1"
+log_message "2: $2"
+log_message "MODE: $MODE"
+log_message "Resolving displays"
+
+MONITOR_COUNT=$(xrandr --verbose | grep -v disconnected | grep connected | wc -l)
+
+log_message "Monitor Count: $MONITOR_COUNT"
+
+
+
+PRIMARY_DISPLAY=$(xrandr --verbose   | grep -v disconnected | grep connected |  grep primary | grep "3440x1440" | awk '{print $1}')
+SECONDARY_DISPLAY=$(xrandr --verbose | grep -v disconnected | grep connected |  grep -v primary | grep "1080x1920" | awk '{print $1}')
+
+log_message "PRIMARY_DISPLAY : $PRIMARY_DISPLAY"
+log_message "SECONDARY_DISPLAY : $SECONDARY_DISPLAY"
+
+MAIN_NAME="kittykuake_main"
+AUX_NAME="kittykuake_aux"
+
+if [ "$MODE" == "aux" ]; then
+  echo "== AUX_SCREEN" >> /tmp/tdrop_local_log
+  # tdrop -a -m --monitor=$SECONDARY_DISPLAY -n kittykuake_aux -x 0 -y 0 -w 100% -h 100% kitty --title kittykuake_aux &
+  # FIXES: visible title window
+  # tdrop -a -m --monitor=$SECONDARY_DISPLAY -n kittykuake_aux -x 3700 -y 0 -h 1950 kitty --title kittykuake_aux  -o "hide_window_decorations=yes" &
+  # TODO: fix aux geometry when mouse over principal monitor
+  # these two were working minus the todo 
+  # tdrop -m -a --monitor=$SECONDARY_DISPLAY -n kittykuake_aux -x 3500 -y -30 -h 100% -w 100% kitty --title kittykuake_aux -o "hide_window_decorations=yes" &
+  # tdrop -a -m --monitor=$SECONDARY_DISPLAY -n kittykuake_aux -x 3500 -y 0 -h 100% -w 100% kitty --title kittykuake_aux -o "hide_window_decorations=yes" &
+  cmd="tdrop -m -a --monitor=$SECONDARY_DISPLAY -n kittykuake_aux -x 3500 -y 0 -h 100% -w 100% kitty --title kittykuake_aux -o \"hide_window_decorations=yes\" &"
+else
+  echo "== MAIN_SCREEN" >> /tmp/tdrop_local_log
+  cmd="tdrop -a -m --monitor=$PRIMARY_DISPLAY -n kittykuake_main -x 0 -y 0 -w 100% -h 100% kitty --title kittykuake_main -o \"hide_window_decorations=yes\" &"
+fi
+
+echo "$cmd"  >> /tmp/tdrop_local_log
+eval $cmd
+EXITSTATUS=$?
+
+echo "finish $?"  >> /tmp/tdrop_local_log
