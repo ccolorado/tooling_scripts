@@ -8,13 +8,75 @@
 #
 # upsert maight not be self explanatory so it connects to a brand
 # new container by destroying it if it exists
+# 
+# Configuration:
+# DVM_CONTAINER_NAME=""
+# DVM_CONTAINER_SHELL=""
+# DVM_CONTAINER_TAG=""
+# DVM_STORAGE_DIR="."
+# DVM_MOUNTPOINT_DIR="/app"
+# DVM_IMAGE_NAME="archlinux:latest"
+# DVM_USE_CACHE="false"
+# DVM_USE_CURRENT_USERNAME="false"
+# DVM_GROUP_USER_MASK="1000:1000"
+# CONNECT=""
+# CREATE=""
+# DESTROY=""
+# START=""
+# STOP=""
+#
+#
+#
+## Configuration Defaults
+# # TODO: add defaults for all settings or at least:
+# 
+#  * DVM_STORAGE_DIR="."
+#  * DVM_CONTAINER_NAME=""
+#  * DVM_CONTAINER_SHELL="/bin/bash"
+#  * DVM_CONTAINER_TAG= $DVM_IMAGE_NAME:$DVM_CONTAINER_NAME  # TODO Think about the dvalue :  unsure about the exact template or escaping : is required
+#  * DVM_MOUNTPOINT_DIR="/app"
+#  * DVM_USE_CURRENT_USERNAME=  #TODO thing about the dvalue
 
-# TODO: add override commands
+# TODO: change INIT_CONFIG_FILE from .denv to dvm and dvm.log
+# TODO: add override commands to the template "start stop conect" etc
+# TODO: Use a multiline echo instead of an escaped string
+
 INIT_CONFIG_FILE="./.denv"
 LOG_FILE=$INIT_CONFIG_FILE"_log"
 INIT_CONFIG_TEMPLATE="
 DVM_STORAGE_DIR=\"\"\nDVM_MOUNTPOINT_DIR=\"/app\"\nDVM_IMAGE_NAME=\"\"\nDVM_CONTAINER_NAME=\"\"\nDVM_CONTAINER_SHELL=\"\"\nDVM_USE_CACHE=\"\"\nCONNECT=\"\"\nCREATE=\"\"\nDESTROY=\"\"\nSTART=\"\"\nSTOP=\"\""
 
+# TODO: Check https://github.com/boxboat/fixuid for better permission transparency
+
+# Override OWNERSHIPMASK or use default
+DEFAULT_CURRENT_USER=""
+DVM_OWNERSHIP_MASK=""
+DVM_USER_CONFIG=""
+
+# if [ -n "$DVM_GROUP_USER_MASK" && -n "$DVM_USE_CURRENT_USERNAME" ]; then
+#   # TODO: EMIT warning about current user and ownership mask in confict
+#   # TODO: Decide wich seting takes precedent
+# fi
+
+# SOLVE OWNERSHIP MASK START
+if [ "$DVM_USE_CURRENT_USERNAME" == "true" ]; then
+  # TODO: if DVM_GROUP_USER_MASK emit a warning that will be ignored
+  DVM_OWNERSHIP_MASK="$(id -u):$(id -g)"
+fi
+
+if [ -n "$DVM_GROUP_USER_MASK" ]; then
+  DVM_OWNERSHIP_MASK="$DVM_GROUP_USER_MASK"
+fi
+# SOLVE OWNERSHIP MASK END
+
+if [ -n "$DVM_OWNERSHIP_MASK" ]; then
+  DVM_OWNERSHIP_MASK="--user $DVM_OWNERSHIP_MASK"
+fi
+
+DVM_GROUP_USER_MASK="1000:1000"
+
+
+DVM_USER_CONFIG="--user $DVM_OWNERSHIP_MASK"
 
 function log_message {
   echo $1 >> $LOG_FILE
@@ -38,7 +100,7 @@ function create_container {
     cache="--no-cache"
   fi
 
-  run_cmd "docker build $cache -t $DVM_CONTAINER_TAG ."
+  run_cmd "docker build $cache -t $DVM_CONTAINER_TAG ./"
 
 
   # TODO: only include -v if declared
@@ -61,12 +123,12 @@ function start_container {
     run_cmd "docker start $DVM_CONTAINER_NAME"
   else
     echo "STARTING CONTAINER"
-    run_cmd "docker run -d -it --name $DVM_CONTAINER_NAME $volume $DVM_IMAGE_NAME"
+    run_cmd "docker run -d -it $DVM_USER_CONFIG --name $DVM_CONTAINER_NAME $volume $DVM_CONTAINER_TAG"
   fi
 }
 
 function connect_container {
-  run_cmd "docker exec -w $DVM_MOUNTPOINT_DIR -it $DVM_CONTAINER_NAME $DVM_CONTAINER_SHELL"
+  run_cmd "docker exec $DVM_USER_CONFIG -w $DVM_MOUNTPOINT_DIR -it $DVM_CONTAINER_NAME $DVM_CONTAINER_SHELL"
 }
 
 function stop_container {
