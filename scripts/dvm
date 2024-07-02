@@ -19,6 +19,7 @@
 # DVM_USE_CACHE="false"
 # DVM_USE_CURRENT_USERNAME="false"
 # DVM_GROUP_USER_MASK="1000:1000"
+# DVM_PORT_MAPPING
 # CONNECT=""
 # CREATE=""
 # DESTROY=""
@@ -51,7 +52,17 @@ DVM_STORAGE_DIR=\"\"\nDVM_MOUNTPOINT_DIR=\"/app\"\nDVM_IMAGE_NAME=\"\"\nDVM_CONT
 # Override OWNERSHIPMASK or use default
 DEFAULT_CURRENT_USER=""
 DVM_OWNERSHIP_MASK=""
+
+
+# TODO: use CONFIG as a prefix for operational generated values
+# CONFIG_ contains flags and settigns eg "--name $DVM_CONTAINER_NAME" 
+
 DVM_USER_CONFIG=""
+CONFIG_DVM_PORT=""
+
+if [ -f "$INIT_CONFIG_FILE" ]; then
+  source $INIT_CONFIG_FILE
+fi
 
 # if [ -n "$DVM_GROUP_USER_MASK" && -n "$DVM_USE_CURRENT_USERNAME" ]; then
 #   # TODO: EMIT warning about current user and ownership mask in confict
@@ -70,13 +81,12 @@ fi
 # SOLVE OWNERSHIP MASK END
 
 if [ -n "$DVM_OWNERSHIP_MASK" ]; then
-  DVM_OWNERSHIP_MASK="--user $DVM_OWNERSHIP_MASK"
+  DVM_USER_CONFIG="--user $DVM_OWNERSHIP_MASK"
 fi
 
-DVM_GROUP_USER_MASK="1000:1000"
-
-
-DVM_USER_CONFIG="--user $DVM_OWNERSHIP_MASK"
+if [ -n "$DVM_CONFIG_PORT_MAPPING" ]; then
+  CONFIG_DVM_PORT=$DVM_CONFIG_PORT_MAPPING
+fi
 
 function log_message {
   echo $1 >> $LOG_FILE
@@ -123,7 +133,7 @@ function start_container {
     run_cmd "docker start $DVM_CONTAINER_NAME"
   else
     echo "STARTING CONTAINER"
-    run_cmd "docker run -d -it $DVM_USER_CONFIG --name $DVM_CONTAINER_NAME $volume $DVM_CONTAINER_TAG"
+    run_cmd "docker run -d -it $DVM_USER_CONFIG $CONFIG_DVM_PORT --name $DVM_CONTAINER_NAME $volume $DVM_CONTAINER_TAG"
   fi
 }
 
@@ -188,6 +198,9 @@ function upsert_container {
   log_message "-----------------------"
   log_message "| upserting container |"
   log_message "-----------------------"
+  log_message "|>"$0
+  log_message "|>"$1
+  log_message "|>"$2
 
   visibleStep "1/5 Stopping existing container if exists"
   stop_container
@@ -238,6 +251,9 @@ case "$1" in
     ;;
   "start")
     validateConfigFile && start_container
+    ;;
+  "restart")
+    validateConfigFile && stop_container && start_container
     ;;
   "connect")
     validateConfigFile && connect_container

@@ -3,43 +3,78 @@
 # Script that attempts to "kick" fix audio into working
 # kills pipewire if exists and then tries to set the bluetooth headset bluetooth.codec to ldac_sq
 # Does not validate if the devisce exists
+#
+# Note: address string example
+# bluez.path = "/org/bluez/hci0/dev_01_80_DE_00_0A_F7"
+#
+# TODO: check if kdialog is installed and notify action taken
 
-# set -x
+declare -A DEVICES
 
-STATUS=$(pactl list | grep -e "bluetooth.codec\|bluetooth.battery" | sort | uniq)
+DEVICES["01_80_DE_00_0A_F7"]="alias=OP3 codec=ldac_sq"
+DEVICES["AC_80_0A_77_BB_63"]="alias=W1k codec=ldac_sq"
+DEVICES["01_02_03_04_67_AC"]="alias=EN4 codec=ldac_sq"
+DEVICES["98_80_BB_40_CE_2D"]="alias=A4P codec=aptx"
 
-
-CODEC_FIND_CMD=$(echo "$STATUS" | grep codec | tail -1 | cut -d'=' -f2)
-BATTERY_FIND_CMD=$(echo "$STATUS" | grep battery | tail -1 | cut -d'=' -f2)
-
-# echo "__STATE_START__"
-# echo "CODEC:$CODEC_FIND_CMD"
-# echo "BATT:$BATTERY_FIND_CMD"
-# echo " CURRENT CODEC:$CODEC_FIND_CMD;"
-# echo "start"
-
-killall pipewire > /dev/null
-
-if [ "$CODEC_FIND_CMD" = " \"ldac_sq\"" ]; then
-
-  echo "Codec is already ldac_sq";
-
-else
-
-  echo "executing > "
-  echo $CODEC_FIND_CMD
-  set -x
-  pactl send-message /card/bluez_card.01_80_DE_00_0A_F7/bluez switch-codec '"ldac_sq"';
-  set +x
-
+LOG_FILE="/tmp/ss_redosound.log"
+if [ ! -f "$LOG_FILE" ]; then
+    touch $LOG_FILE;
+    chmod o+rw $LOG_FILE
 fi
 
+# Function to check connected Bluetooth devices from pactl sinks
+check_connected_device() {
+    local sink_list; sink_list=$(pactl list sinks | grep "bluez.path" | sort | uniq | cut -d= -f2)
+    local connected_device=""
 
-echo "___STATE_END___"
-sleep 1
-STATUS=$(pactl list | grep -e "bluetooth.codec\|bluetooth.battery" | sort | uniq)
-NEW_CODEC_FIND_CMD=$(echo "$STATUS" | grep codec | tail -1 | cut -d'=' -f2)
-BATTERY_FIND_CMD=$(echo "$STATUS" | grep battery | tail -1 | cut -d'=' -f2)
-echo "CODEC:$CODEC_FIND_CMD -> $NEW_CODEC_FIND_CMD"
-echo "BATT:$BATTERY_FIND_CMD"
-echo $STATUS
+    for device in "${!DEVICES[@]}"; do
+        if printf '%s\n' "$sink_list" | grep -qi "$device"; then
+            # echo "* $device"
+            connected_device=$device
+            break
+        fi
+    done
+
+    if [[ -n $connected_device ]]; then
+        printf '%s\n' "$connected_device"
+    else
+        printf '%s\n' ""
+    fi
+}
+
+STATUS=$(pactl list sinks | grep -e "bluetooth.codec\|bluetooth.battery\|bluez.path" | sort | uniq)
+CODEC_FIND_CMD=$(echo "$STATUS" | grep codec | tail -1 | cut -d'=' -f2)
+CODEC_FIND_CMD=$(echo $CODEC_FIND_CMD | tr -d '"')
+
+BATTERY_FIND_CMD=$(echo "$STATUS" | grep battery | tail -1 | cut -d= -f2)
+
+ADDRESS=$(check_connected_device)
+touple="${DEVICES[$ADDRESS]}"
+
+ALIAS=$(echo $touple | cut -d\  -f1 | cut -d= -f2)
+CODEC=$(echo $touple | cut -d\  -f2 | cut -d= -f2)
+
+echo "================================================ "
+echo -e $STATUS
+echo "================================================ "
+
+echo $STATUS >> /tmp/ss_redosound.log
+
+echo "Detected Device $ALIAS"
+echo "Address : $ADDRESS"
+echo "Codec   : $CODEC_FIND_CMD => $CODEC"
+echo "BAttery : $BATTERY_FIND_CMD"
+
+if [ $CODEC_FIND_CMD != "$CODEC" ]; then
+  echo "Switching..."
+  SINK_SELECTOR="/card/bluez_card.$ADDRESS/bluez"
+  # command="pactl send-message $SINK_SELECTOR switch-codec '$CODEC'"
+  command="pactl send-message $SINK_SELECTOR switch-codec $CODEC"
+  $command
+fi
+
+# pactl send-message /card/bluez_card.01_02_03_04_67_AC/bluez switch-codec 'ldac_sq'
+# Switching...
+# pactl send-message /card/bluez_card.01_80_DE_00_0A_F7/bluez switch-codec 'ldac_sq';
+
+echo "[$(date)] end ss_redosound" >> /tmp/ss_redosound.log
