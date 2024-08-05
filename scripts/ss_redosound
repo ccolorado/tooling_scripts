@@ -9,20 +9,24 @@
 #
 # TODO: check if kdialog is installed and notify action taken
 
-declare -A DEVICES
 
+declare -A DEVICES
 DEVICES["01_80_DE_00_0A_F7"]="alias=OP3 codec=ldac_sq"
 DEVICES["AC_80_0A_77_BB_63"]="alias=W1k codec=ldac_sq"
 DEVICES["01_02_03_04_67_AC"]="alias=EN4 codec=ldac_sq"
 DEVICES["98_80_BB_40_CE_2D"]="alias=A4P codec=aptx"
 
 LOG_FILE="/tmp/ss_redosound.log"
-if [ ! -f "$LOG_FILE" ]; then
-    touch $LOG_FILE;
-    chmod o+rw $LOG_FILE
-fi
+
+touch $LOG_FILE;
+chmod a+rw $LOG_FILE
 
 # Function to check connected Bluetooth devices from pactl sinks
+echo $(date)" start ss_redosound" >> $LOG_FILE
+echo "0 $0" >> $LOG_FILE
+echo "1 $1" >> $LOG_FILE
+echo "2 $2" >> $LOG_FILE
+
 check_connected_device() {
     local sink_list; sink_list=$(pactl list sinks | grep "bluez.path" | sort | uniq | cut -d= -f2)
     local connected_device=""
@@ -42,6 +46,8 @@ check_connected_device() {
     fi
 }
 
+
+
 STATUS=$(pactl list sinks | grep -e "bluetooth.codec\|bluetooth.battery\|bluez.path" | sort | uniq)
 CODEC_FIND_CMD=$(echo "$STATUS" | grep codec | tail -1 | cut -d'=' -f2)
 CODEC_FIND_CMD=$(echo $CODEC_FIND_CMD | tr -d '"')
@@ -54,11 +60,15 @@ touple="${DEVICES[$ADDRESS]}"
 ALIAS=$(echo $touple | cut -d\  -f1 | cut -d= -f2)
 CODEC=$(echo $touple | cut -d\  -f2 | cut -d= -f2)
 
+echo "Alias : $ALIAS" >> $LOG_FILE;
+echo "ADDRESS : $ADDRESS" >> $LOG_FILE;
+echo "Codec : $CODEC_FIND_CMD => $CODEC" >> $LOG_FILE;
+
 echo "================================================ "
 echo -e $STATUS
 echo "================================================ "
 
-echo $STATUS >> /tmp/ss_redosound.log
+echo $STATUS >> $LOG_FILE
 
 echo "Detected Device $ALIAS"
 echo "Address : $ADDRESS"
@@ -71,10 +81,8 @@ if [ $CODEC_FIND_CMD != "$CODEC" ]; then
   # command="pactl send-message $SINK_SELECTOR switch-codec '$CODEC'"
   command="pactl send-message $SINK_SELECTOR switch-codec $CODEC"
   $command
+else
+  echo "Nothing to do";
 fi
 
-# pactl send-message /card/bluez_card.01_02_03_04_67_AC/bluez switch-codec 'ldac_sq'
-# Switching...
-# pactl send-message /card/bluez_card.01_80_DE_00_0A_F7/bluez switch-codec 'ldac_sq';
-
-echo "[$(date)] end ss_redosound" >> /tmp/ss_redosound.log
+echo "[$(date)] end ss_redosound" >> $LOG_FILE
