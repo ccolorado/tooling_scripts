@@ -7,7 +7,9 @@
 # TODO: support hyprland with hdrop
 
 MODE=$1
-LOG_FILE="/tmp/kittykuake_log"
+
+mkdir -p "/tmp/scripts/"
+LOG_FILE="/tmp/scripts/kittykuake_log"
 
 function log_message {
   echo $1
